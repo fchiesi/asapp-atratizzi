@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  typecheck-lint-build:
+    name: TypeScript + ESLint + Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          # Build precisa do schema mas nao das credenciais reais.
+          # Service Account + chaves sao validadas em runtime, nao em build.
+          GOOGLE_SERVICE_ACCOUNT_EMAIL: "ci@example.com"
+          GOOGLE_SERVICE_ACCOUNT_KEY: "ci-placeholder"
+          SHEETS_ASAPP_ID: "ci-placeholder"
+          ANTHROPIC_API_KEY: "ci-placeholder"
+          NEXTAUTH_SECRET: "ci-placeholder-secret-32-chars-x"
+          NEXTAUTH_URL: "http://localhost:3000"
+          AUTH_GOOGLE_ID: "ci-placeholder"
+          AUTH_GOOGLE_SECRET: "ci-placeholder"
+          AUTH_ALLOWED_EMAILS: "ci@example.com"
