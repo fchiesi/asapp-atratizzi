@@ -11,7 +11,7 @@ Google Sheets via Service Account, chat com Claude), com módulos pensados para 
 | `/painel` | diretoria, administrativo, sócios | Metas do mês: metros faturados × meta e ponto de equilíbrio, preço médio, conversão de amostra, dias de parada da R1, perdas, entregas no prazo, inadimplência, resultado de caixa. Botão **Imprimir relatório** (relatório mensal aos sócios). |
 | `/comercial` | vendedor, administrativo, diretoria | Clientes e orçamentos. Preço sugerido por serviço, +20% urgente, aviso de pedido mínimo. Fluxo **orçamento → amostra cobrada (R$ 80) → aprovar → pedido**. |
 | `/pedidos` | idem + produção | Pedidos com metros impressos × pedidos, prazo, atraso, status, máquina, NF e **Entregue**. |
-| `/producao` | produção (celular) | Metros por Reggiani hoje, **flush** diário, rodada semanal da R2, **apontamento** (pedido, máquina, etapa, metros, perda), **parada** (horas e causa), fila. |
+| `/producao` | produção (celular) | Metros por Reggiani hoje, **flush** com motivo (troca de tinta ou entupimento - não é diário) e último flush, rodada semanal da R2, **apontamento** (pedido, máquina, etapa, metros, perda), **parada** (horas e causa), fila. |
 | `/financeiro` | administrativo, diretoria, sócios | Recebido/pago/resultado do mês, a receber/a pagar, inadimplência, 6 meses, lançar gasto/recebimento, marcar pago/recebido. |
 | `/chat` | diretoria | Chat com Claude (Opus 5.5) sobre tudo acima, com as mesmas regras das telas. |
 

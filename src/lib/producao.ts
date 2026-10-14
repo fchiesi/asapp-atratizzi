@@ -1,6 +1,7 @@
 import { agoraBR, atualizar, hojeBR, inserir, lerTabela, ordinal } from "@/lib/planilha";
 import {
   CAUSAS_PARADA,
+  ehFlush,
   ETAPAS,
   MAQUINAS,
   TIPOS_ROTINA,
@@ -15,7 +16,8 @@ import { isValidDateBR } from "@/lib/sheets";
  * - apontamento de metros por pedido, maquina e etapa (com perda)
  * - registro de TODA parada da Reggiani 1 desde o primeiro dia (mostra
  *   quanto a Reggiani 2 esta cobrindo)
- * - flush diario nas duas maquinas; R2 roda pelo menos 1x por semana
+ * - flush (troca de tinta ou entupimento - nao e diario) e rodada semanal
+ *   da R2 (roda pelo menos 1x por semana para nao secar as cabecas)
  */
 
 function maquinaValida(m: unknown): Maquina {
@@ -111,7 +113,8 @@ export async function registrarRotina(
 export interface ResumoMaquina {
   maquina: Maquina;
   metrosHoje: number;
-  flushHoje: boolean;
+  /** ultimo flush registrado (qualquer motivo); null = nenhum */
+  ultimoFlush: { dataHora: string; tipo: string; dias: number } | null;
   horasParadasHoje: number;
   /** dias desde a ultima rodada (impressao ou rodada_semanal); null = nunca */
   diasSemRodar: number | null;
@@ -152,7 +155,8 @@ export async function painelProducao(): Promise<PainelProducao> {
     const metrosHoje = aptosM
       .filter((a) => a.ETAPA === "impressao" && ordinal(a.DATA_HORA) === ordHoje)
       .reduce((s, a) => s + Number(a.METROS), 0);
-    const flushHoje = rotina.some((r) => r.MAQUINA === m && r.TIPO === "flush" && ordinal(r.DATA_HORA) === ordHoje);
+    // a aba e' so acrescentada: o ultimo flush da maquina e' a ultima linha
+    const flush = rotina.filter((r) => r.MAQUINA === m && ehFlush(r.TIPO)).at(-1);
     const horasParadasHoje = paradas
       .filter((p) => p.MAQUINA === m && ordinal(p.DATA) === ordHoje)
       .reduce((s, p) => s + Number(p.HORAS), 0);
@@ -164,7 +168,9 @@ export async function painelProducao(): Promise<PainelProducao> {
     return {
       maquina: m,
       metrosHoje,
-      flushHoje,
+      ultimoFlush: flush
+        ? { dataHora: String(flush.DATA_HORA), tipo: String(flush.TIPO), dias: diasEntre(ordinal(flush.DATA_HORA), ordHoje) }
+        : null,
       horasParadasHoje,
       diasSemRodar: ultima ? diasEntre(ultima, ordHoje) : null,
     };

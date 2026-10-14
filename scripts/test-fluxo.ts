@@ -78,14 +78,17 @@ async function main() {
   assert.equal(a2.avisos.length, 1, "115 m de 100 m passa de 110%");
   await assert.rejects(prod.apontar({ pedidoId: "P-0001", maquina: "R3", etapa: "impressao", metros: 1 }, quem), ErroNegocio);
   await prod.registrarParada({ maquina: "R1", horas: 2, causa: "cabeca", descricao: "entupiu" }, quem);
-  await prod.registrarRotina({ maquina: "R1", tipo: "flush" }, quem);
+  await prod.registrarRotina({ maquina: "R1", tipo: "flush_tinta" }, quem);
+  await prod.registrarRotina({ maquina: "R1", tipo: "flush_entupimento" }, quem);
+  await assert.rejects(prod.registrarRotina({ maquina: "R1", tipo: "flush" }, quem), ErroNegocio);
   const painel = await prod.painelProducao();
   const r1 = painel.maquinas.find((m) => m.maquina === "R1")!;
   assert.equal(r1.metrosHoje, 60);
-  assert.equal(r1.flushHoje, true);
+  assert.equal(r1.ultimoFlush?.tipo, "flush_entupimento");
+  assert.equal(r1.ultimoFlush?.dias, 0);
   assert.equal(r1.horasParadasHoje, 2);
-  assert.equal(painel.maquinas.find((m) => m.maquina === "R2")!.flushHoje, false);
-  ok("apontamento move pedido p/ em producao, aviso >110%, parada e flush aparecem no painel");
+  assert.equal(painel.maquinas.find((m) => m.maquina === "R2")!.ultimoFlush, null);
+  ok("apontamento move pedido p/ em producao, aviso >110%, parada e ultimo flush com motivo no painel");
 
   // 5. entrega
   await com.alterarPedido("P-0001", { status: "entregue", nf: "000123" }, quem);
@@ -121,7 +124,10 @@ async function main() {
   assert.equal(v("preco_medio").valor, (1800 + 340) / 120);
   assert.equal(v("conversao").valor, 1, "1 amostra, 1 pedido");
   assert.equal(v("prazo").valor, 1);
-  assert.equal(ind.producao.find((p) => p.maquina === "R1")!.horasParadas, 2);
+  const indR1 = ind.producao.find((p) => p.maquina === "R1")!;
+  assert.equal(indR1.horasParadas, 2);
+  assert.equal(indR1.flushes, 2);
+  assert.equal(indR1.flushesEntupimento, 1);
   assert.ok(Math.abs((v("perdas").valor ?? 0) - 3 / 118) < 1e-9);
   ok(
     `indicadores: ${v("metros").valor} m, preco medio R$ ${(v("preco_medio").valor ?? 0).toFixed(2)}, conversao 100%, perda ${(((v("perdas").valor ?? 0) * 100)).toFixed(1)}%`,

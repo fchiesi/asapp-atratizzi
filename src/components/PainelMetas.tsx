@@ -146,6 +146,9 @@ export function PainelMetas({ mesInicial }: { mesInicial: string }) {
                     <th className="text-right font-normal pb-2">Impresso</th>
                     <th className="text-right font-normal pb-2">Dias parada</th>
                     <th className="text-right font-normal pb-2">Horas</th>
+                    <th className="text-right font-normal pb-2" title="Flushes no mes (por entupimento)">
+                      Flush (entup.)
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -155,6 +158,10 @@ export function PainelMetas({ mesInicial }: { mesInicial: string }) {
                       <td className="text-right tabular-nums">{metrosFmt(p.metrosImpressos)}</td>
                       <td className="text-right tabular-nums">{p.diasParados}</td>
                       <td className="text-right tabular-nums">{p.horasParadas.toLocaleString("pt-BR")}</td>
+                      <td className="text-right tabular-nums">
+                        {p.flushes}
+                        {p.flushes > 0 && <span className="text-gray-500"> ({p.flushesEntupimento})</span>}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

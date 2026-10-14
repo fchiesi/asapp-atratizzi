@@ -13,7 +13,7 @@ import { ErroNegocio } from "@/lib/erros";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-/** GET /api/producao -> fila, maquinas (metros hoje, flush, paradas), ultimos apontamentos */
+/** GET /api/producao -> fila, maquinas (metros hoje, ultimo flush, paradas), ultimos apontamentos */
 export async function GET() {
   const guard = await requireAuth("view_producao");
   if (guard instanceof NextResponse) return guard;

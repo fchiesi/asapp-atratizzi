@@ -9,8 +9,10 @@ import {
   MAQUINA_LABEL,
   MAQUINAS,
   metrosFmt,
+  ROTINA_LABEL,
   STATUS_PEDIDO_LABEL,
   type Maquina,
+  type TipoRotina,
 } from "@/lib/config";
 import { api } from "@/lib/cliente-api";
 import { gravarCache, lerCache } from "@/lib/client-cache";
@@ -20,7 +22,7 @@ const CACHE = "producao";
 const ATUALIZA_MS = 60_000;
 
 /**
- * Tela do chao de fabrica (celular): metros por maquina hoje, flush,
+ * Tela do chao de fabrica (celular): metros por maquina hoje, ultimo flush,
  * apontamento, parada e fila. Atualiza sozinha a cada minuto e pinta na hora
  * com o ultimo dado visto (cache local, igual ao SApp).
  */
@@ -103,9 +105,14 @@ export function Producao({ podeApontar }: { podeApontar: boolean }) {
                     <p className="text-xs text-gray-500">{MAQUINA_LABEL[m.maquina]}</p>
                     <p className="text-2xl font-bold tabular-nums">{metrosFmt(m.metrosHoje)}</p>
                     <p className="text-xs text-gray-500">impressos hoje</p>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Ultimo flush:{" "}
+                      {m.ultimoFlush
+                        ? `${m.ultimoFlush.dataHora.slice(0, 5)} (${ROTINA_LABEL[m.ultimoFlush.tipo as TipoRotina]?.replace("Flush - ", "") ?? "sem motivo"}${m.ultimoFlush.dias > 0 ? `, ha ${m.ultimoFlush.dias} d` : ", hoje"})`
+                        : "nenhum registrado"}
+                    </p>
                   </div>
                   <div className="text-right space-y-1">
-                    {m.flushHoje ? <Etiqueta cor="verde">flush feito</Etiqueta> : <Etiqueta cor="amarelo">sem flush hoje</Etiqueta>}
                     {m.horasParadasHoje > 0 && (
                       <div>
                         <Etiqueta cor="vermelho">{m.horasParadasHoje} h parada</Etiqueta>
@@ -118,33 +125,7 @@ export function Producao({ podeApontar }: { podeApontar: boolean }) {
                     )}
                   </div>
                 </div>
-                {podeApontar && (
-                  <div className="flex gap-2 mt-3">
-                    {!m.flushHoje && (
-                      <Botao
-                        tipo="secundario"
-                        onClick={() =>
-                          enviar({ tipo: "rotina", maquina: m.maquina, rotina: "flush" }, `Flush da ${m.maquina} registrado.`)
-                        }
-                      >
-                        Fiz o flush
-                      </Botao>
-                    )}
-                    {m.maquina === "R2" && (
-                      <Botao
-                        tipo="secundario"
-                        onClick={() =>
-                          enviar(
-                            { tipo: "rotina", maquina: "R2", rotina: "rodada_semanal" },
-                            "Rodada semanal da R2 registrada.",
-                          )
-                        }
-                      >
-                        Rodada semanal
-                      </Botao>
-                    )}
-                  </div>
-                )}
+                {podeApontar && <AcoesMaquina maquina={m.maquina} enviar={enviar} />}
               </Card>
             ))}
           </div>
@@ -202,6 +183,49 @@ export function Producao({ podeApontar }: { podeApontar: boolean }) {
 }
 
 type Enviar = (body: Record<string, unknown>, ok: string) => Promise<boolean>;
+
+/**
+ * Flush nao e diario: so na troca de tinta ou quando a cabeca entope. O botao
+ * abre a escolha do motivo, que vai para o painel do mes (entupimento
+ * frequente = cabeca com problema).
+ */
+function AcoesMaquina({ maquina, enviar }: { maquina: Maquina; enviar: Enviar }) {
+  const [escolhendo, setEscolhendo] = useState(false);
+  const flush = (rotina: TipoRotina) =>
+    enviar({ tipo: "rotina", maquina, rotina }, `${ROTINA_LABEL[rotina]} na ${maquina} registrado.`).then((ok) => {
+      if (ok) setEscolhendo(false);
+    });
+
+  return (
+    <div className="flex flex-wrap gap-2 mt-3">
+      {escolhendo ? (
+        <>
+          <Botao tipo="secundario" onClick={() => flush("flush_tinta")}>
+            Troca de tinta
+          </Botao>
+          <Botao tipo="secundario" onClick={() => flush("flush_entupimento")}>
+            Entupimento
+          </Botao>
+          <Botao tipo="secundario" onClick={() => setEscolhendo(false)}>
+            Cancelar
+          </Botao>
+        </>
+      ) : (
+        <Botao tipo="secundario" onClick={() => setEscolhendo(true)}>
+          Registrar flush
+        </Botao>
+      )}
+      {maquina === "R2" && !escolhendo && (
+        <Botao
+          tipo="secundario"
+          onClick={() => enviar({ tipo: "rotina", maquina: "R2", rotina: "rodada_semanal" }, "Rodada semanal da R2 registrada.")}
+        >
+          Rodada semanal
+        </Botao>
+      )}
+    </div>
+  );
+}
 
 function FormApontar({ painel, enviar }: { painel: PainelProducao; enviar: Enviar }) {
   const [pedidoId, setPedidoId] = useState(painel.fila[0]?.id ?? "");

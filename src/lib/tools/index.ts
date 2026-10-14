@@ -83,7 +83,7 @@ const TOOLS: Record<string, { definition: Tool; handler: Handler }> = {
     definition: {
       name: "consultar_producao",
       description:
-        "Situacao da producao: por maquina (R1/R2) metros impressos hoje, flush feito hoje, horas paradas hoje, dias sem rodar; fila de pedidos abertos; ultimos apontamentos. Com `mes`, devolve tambem as paradas do mes.",
+        "Situacao da producao: por maquina (R1/R2) metros impressos hoje, ultimo flush (data e motivo: troca de tinta ou entupimento), horas paradas hoje, dias sem rodar; fila de pedidos abertos; ultimos apontamentos. Com `mes`, devolve tambem as paradas do mes.",
       input_schema: { type: "object", properties: { mes: mesArg } },
     },
     handler: async (i) => {

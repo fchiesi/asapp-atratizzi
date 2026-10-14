@@ -142,8 +142,26 @@ export const CAUSA_LABEL: Record<(typeof CAUSAS_PARADA)[number], string> = {
   outro: "Outro",
 };
 
-/** Rotina diaria das maquinas (flush) e semanal (R2 roda 1x por semana). */
-export const TIPOS_ROTINA = ["flush", "limpeza", "rodada_semanal"] as const;
+/**
+ * Eventos de manutencao registrados na aba ROTINA.
+ * - flush: limpeza da cabeca, NAO e diaria - so na troca de tinta ou quando
+ *   a cabeca entope (decisao do Fernando, 14/10/2026). Flush por entupimento
+ *   frequente e sinal de problema na cabeca.
+ * - rodada_semanal: R2 roda pelo menos 1x por semana para nao secar.
+ */
+export const TIPOS_ROTINA = ["flush_tinta", "flush_entupimento", "limpeza", "rodada_semanal"] as const;
+export type TipoRotina = (typeof TIPOS_ROTINA)[number];
+export const ROTINA_LABEL: Record<TipoRotina, string> = {
+  flush_tinta: "Flush - troca de tinta",
+  flush_entupimento: "Flush - entupimento",
+  limpeza: "Limpeza",
+  rodada_semanal: "Rodada semanal",
+};
+
+/** True para qualquer flush (inclui o tipo antigo "flush", sem motivo). */
+export function ehFlush(tipo: unknown): boolean {
+  return String(tipo).startsWith("flush");
+}
 
 export const CATEGORIAS_GASTO = [
   "salario",

@@ -1,5 +1,5 @@
 import { lerTabela, noMes, ordinal } from "@/lib/planilha";
-import { CUSTO_VARIAVEL_M, LIMITES, MAQUINAS, METAS_PADRAO, PRECO_MINIMO_M } from "@/lib/config";
+import { CUSTO_VARIAVEL_M, ehFlush, LIMITES, MAQUINAS, METAS_PADRAO, PRECO_MINIMO_M } from "@/lib/config";
 import { resumoFinanceiro } from "@/lib/financeiro";
 
 /**
@@ -31,7 +31,14 @@ export interface Indicadores {
   mesDaOperacao: number | null;
   meta: { metros: number; precoMedio: number; custoFixo: number; origem: "planilha" | "padrao" };
   indicadores: Indicador[];
-  producao: { maquina: string; metrosImpressos: number; diasParados: number; horasParadas: number }[];
+  producao: {
+    maquina: string;
+    metrosImpressos: number;
+    diasParados: number;
+    horasParadas: number;
+    flushes: number;
+    flushesEntupimento: number;
+  }[];
   paradasPorCausa: { causa: string; horas: number }[];
   financeiro: {
     faturamento: number;
@@ -73,12 +80,13 @@ async function metaDoMes(mes: string): Promise<Indicadores["meta"] & { mesDaOper
 const pct = (a: number, b: number) => (b > 0 ? a / b : null);
 
 export async function indicadoresDoMes(mes: string): Promise<Indicadores> {
-  const [meta, pedidos, orcs, aptos, paradas, fin] = await Promise.all([
+  const [meta, pedidos, orcs, aptos, paradas, rotina, fin] = await Promise.all([
     metaDoMes(mes),
     lerTabela("PEDIDOS"),
     lerTabela("ORCAMENTOS"),
     lerTabela("APONTAMENTOS"),
     lerTabela("PARADAS"),
+    lerTabela("ROTINA"),
     resumoFinanceiro(mes),
   ]);
 
@@ -99,8 +107,10 @@ export async function indicadoresDoMes(mes: string): Promise<Indicadores> {
   const perda = aptosMes.reduce((s, a) => s + Number(a.PERDA_M), 0);
 
   const paradasMes = paradas.filter((p) => noMes(p.DATA, mes));
+  const flushMes = rotina.filter((r) => ehFlush(r.TIPO) && noMes(r.DATA_HORA, mes));
   const producao = MAQUINAS.map((m) => {
     const pm = paradasMes.filter((p) => p.MAQUINA === m);
+    const fm = flushMes.filter((r) => r.MAQUINA === m);
     return {
       maquina: m,
       metrosImpressos: aptosMes
@@ -108,6 +118,8 @@ export async function indicadoresDoMes(mes: string): Promise<Indicadores> {
         .reduce((s, a) => s + Number(a.METROS), 0),
       diasParados: new Set(pm.map((p) => String(p.DATA))).size,
       horasParadas: pm.reduce((s, p) => s + Number(p.HORAS), 0),
+      flushes: fm.length,
+      flushesEntupimento: fm.filter((r) => r.TIPO === "flush_entupimento").length,
     };
   });
   const causas = new Map<string, number>();
