@@ -44,12 +44,17 @@ function getClient(): sheets_v4.Sheets {
   // 1. Com aspas duplas no inicio/fim (que ficaram do .env.local)
   // 2. Com \n literais (texto)
   // 3. Com newlines reais (multiline no Vercel)
+  // 4. Em base64 (uma linha so, sem aspas nem quebras: o formato que nao se
+  //    deforma ao colar no painel da Vercel)
   key = key.trim();
   if (
     (key.startsWith('"') && key.endsWith('"')) ||
     (key.startsWith("'") && key.endsWith("'"))
   ) {
     key = key.slice(1, -1);
+  }
+  if (!key.includes("PRIVATE KEY") && /^[A-Za-z0-9+/=\s]+$/.test(key)) {
+    key = Buffer.from(key.replace(/\s/g, ""), "base64").toString("utf8");
   }
   // Converte \n literais pra newlines reais (idempotente)
   key = key.replace(/\\n/g, "\n");
