@@ -56,6 +56,10 @@ export const TABELAS = {
     t("TECIDO"), n("ESTAMPAS"), n("METROS"), n("PRECO_M"), t("URGENTE"), n("VALOR"),
     n("DESCONTO_AMOSTRA"), n("VALOR_LIQUIDO"), d("PRAZO"), t("STATUS"), t("MAQUINA"),
     t("VENDEDOR"), t("NF"), d("DATA_ENTREGA"), t("OBS"), t("CRIADO_POR"),
+    // modelo do SApp: 1 linha = pedido + desenho; PED_CLI agrupa as linhas
+    // do mesmo pedido (e e' a chave do financeiro). DIAS_PGTO: "50/50",
+    // "28", "30/60/90"... Colunas no fim pra nao deslocar as existentes.
+    t("PED_CLI"), t("DESENHO"), t("DIAS_PGTO"),
   ],
   APONTAMENTOS: [
     t("ID"), dh("DATA_HORA"), t("PEDIDO_ID"), t("MAQUINA"), t("ETAPA"), n("METROS"),
@@ -75,6 +79,14 @@ export const TABELAS = {
     t("ID"), d("DATA_EMISSAO"), d("DATA_VENC"), t("CLIENTE"), t("PEDIDO_ID"),
     t("ORCAMENTO_ID"), t("TIPO"), t("NF"), n("VALOR"), t("STATUS"), d("DATA_RECEB"),
     t("BANCO"), t("OBS"), t("ORIGEM"),
+  ],
+  ITENS_ESTOQUE: [
+    t("ID"), t("TIPO"), t("NOME"), t("COR"), t("UNIDADE"), n("LARGURA_M"), t("FORNECEDOR"),
+    n("ESTOQUE_MINIMO"), n("CUSTO_UNIT"), t("ATIVO"), t("OBS"),
+  ],
+  MOV_ESTOQUE: [
+    t("ID"), dh("DATA_HORA"), t("ITEM_ID"), t("ITEM"), t("TIPO_MOV"), n("QUANTIDADE"), n("CUSTO_UNIT"),
+    n("VALOR"), t("FORNECEDOR"), t("NF"), t("PEDIDO"), t("MAQUINA"), t("LOTE"), t("OPERADOR"), t("OBS"),
   ],
   METAS: [
     t("MES"), n("METROS_META"), n("PRECO_MEDIO_META"), n("CUSTO_FIXO"), t("OBS"),
@@ -192,6 +204,7 @@ const PREFIXO_SEQUENCIAL: Partial<Record<Tabela, string>> = {
   CLIENTES: "C",
   ORCAMENTOS: "O",
   PEDIDOS: "P",
+  ITENS_ESTOQUE: "E",
 };
 
 function proximoSequencial(prefixo: string, existentes: string[]): string {

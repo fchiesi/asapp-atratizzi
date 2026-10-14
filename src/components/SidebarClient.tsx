@@ -23,6 +23,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/comercial", label: "Orcamentos e clientes", icon: "💼", requires: "view_pedidos" },
   { href: "/pedidos", label: "Pedidos", icon: "📦", requires: "view_pedidos" },
   { href: "/producao", label: "Producao", icon: "🏭", requires: "view_producao" },
+  { href: "/estoque", label: "Estoque", icon: "🧪", requires: "view_estoque" },
   { href: "/financeiro", label: "Financeiro", icon: "💰", requires: "view_financial" },
   { href: "/chat", label: "Chat IA", icon: "💬", requires: "use_chat" },
 ];

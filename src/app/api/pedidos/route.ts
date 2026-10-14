@@ -1,8 +1,18 @@
 import { NextResponse } from "next/server";
 import { executar, parseJsonBody, quem, requireAuth } from "@/lib/api-helpers";
-import { alterarPedido, listarPedidos, type AlteracaoPedido } from "@/lib/comercial";
+import { alterarPedido, criarPedido, listarPedidos, type AlteracaoPedido, type NovoPedido } from "@/lib/comercial";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
+
+/** POST /api/pedidos  body: NovoPedido (entrada manual, uma linha por desenho) */
+export async function POST(req: Request) {
+  const guard = await requireAuth("write_pedidos");
+  if (guard instanceof NextResponse) return guard;
+  const body = await parseJsonBody<NovoPedido>(req);
+  if (body instanceof NextResponse) return body;
+  return executar(() => criarPedido(body, quem(guard.session)));
+}
 
 /** GET /api/pedidos?abertos=1&status=&cliente= */
 export async function GET(req: Request) {

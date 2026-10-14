@@ -28,6 +28,8 @@ export const CAPABILITIES = [
   "write_pedidos", // cria orcamento, aprova amostra, gera pedido, muda status
   "view_producao", // ve fila, metros impressos, paradas
   "production_apontamento", // aponta metros, parada, flush
+  "view_estoque", // saldos de tinta, tecido e insumos
+  "write_estoque", // entrada, saida/consumo e ajuste de estoque; cadastro de item
   "view_metas", // painel de metas e relatorio mensal
   "use_chat", // chat com IA
 ] as const;
@@ -36,14 +38,15 @@ export type Capability = (typeof CAPABILITIES)[number];
 
 /**
  * - diretoria: Fernando (diretor de gestao e vendas). Tudo.
- * - administrativo: Costa. Compras, contas a pagar/receber, pedidos.
+ * - administrativo: Costa. Compras, contas a pagar/receber, pedidos, estoque.
  * - producao_lider: Junior (responsavel tecnico). Fila, apontamento, paradas,
- *   e pode mudar status de pedido. Sem financeiro.
- * - operador: operador de impressao / auxiliares. So apontamento.
+ *   estoque, e pode mudar status de pedido. Sem financeiro.
+ * - operador: operador de impressao / auxiliares. Apontamento e estoque
+ *   (consumo de tinta, recebimento de tecido).
  * - vendedor: vendedor externo comissionado. Clientes, orcamentos, amostras
  *   e pedidos. Sem financeiro geral.
  * - socio: Sublipaper (Toninho e Nanci). Leitura: metas, relatorio,
- *   financeiro e pedidos. Nao grava nada.
+ *   financeiro, pedidos e estoque. Nao grava nada.
  */
 export const CAPABILITIES_BY_ROLE: Record<Role, readonly Capability[]> = {
   diretoria: [...CAPABILITIES],
@@ -53,6 +56,8 @@ export const CAPABILITIES_BY_ROLE: Record<Role, readonly Capability[]> = {
     "view_pedidos",
     "write_pedidos",
     "view_producao",
+    "view_estoque",
+    "write_estoque",
     "view_metas",
   ],
   producao_lider: [
@@ -60,10 +65,12 @@ export const CAPABILITIES_BY_ROLE: Record<Role, readonly Capability[]> = {
     "write_pedidos",
     "view_producao",
     "production_apontamento",
+    "view_estoque",
+    "write_estoque",
   ],
-  operador: ["view_producao", "production_apontamento"],
+  operador: ["view_producao", "production_apontamento", "view_estoque", "write_estoque"],
   vendedor: ["view_pedidos", "write_pedidos"],
-  socio: ["view_financial", "view_pedidos", "view_producao", "view_metas"],
+  socio: ["view_financial", "view_pedidos", "view_producao", "view_estoque", "view_metas"],
 };
 
 /**
@@ -80,6 +87,7 @@ export const TOOL_CAPABILITY: Record<string, Capability> = {
   consultar_orcamentos: "view_pedidos",
   consultar_clientes: "view_pedidos",
   consultar_producao: "view_producao",
+  consultar_estoque: "view_estoque",
   indicadores_mes: "view_metas",
 };
 

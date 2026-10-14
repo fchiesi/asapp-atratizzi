@@ -1,6 +1,7 @@
 import { lerTabela, noMes, ordinal } from "@/lib/planilha";
 import { CUSTO_VARIAVEL_M, ehFlush, LIMITES, MAQUINAS, METAS_PADRAO, PRECO_MINIMO_M } from "@/lib/config";
 import { resumoFinanceiro } from "@/lib/financeiro";
+import { consumoTintaNoMes } from "@/lib/estoque";
 
 /**
  * Indicadores do mes (Proposta v6, pagina 6) + base do relatorio mensal aos
@@ -14,7 +15,8 @@ import { resumoFinanceiro } from "@/lib/financeiro";
 /** Primeiro mes da operacao (mes 1 do plano). Ajuste quando a data fechar. */
 export const INICIO_OPERACAO = "2026-11";
 
-export type Situacao = "ok" | "alerta" | "atencao" | "sem_dado";
+/** neutro: indicador so de acompanhamento, sem meta na proposta */
+export type Situacao = "ok" | "alerta" | "atencao" | "sem_dado" | "neutro";
 
 export interface Indicador {
   chave: string;
@@ -89,6 +91,7 @@ export async function indicadoresDoMes(mes: string): Promise<Indicadores> {
     lerTabela("ROTINA"),
     resumoFinanceiro(mes),
   ]);
+  const tinta = await consumoTintaNoMes(mes);
 
   const entregues = pedidos.filter((p) => p.STATUS === "entregue" && noMes(p.DATA_ENTREGA, mes));
   const metrosFat = entregues.reduce((s, p) => s + Number(p.METROS), 0);
@@ -126,6 +129,9 @@ export async function indicadoresDoMes(mes: string): Promise<Indicadores> {
   for (const p of paradasMes) causas.set(String(p.CAUSA), (causas.get(String(p.CAUSA)) ?? 0) + Number(p.HORAS));
 
   const r1 = producao.find((p) => p.maquina === "R1")!;
+  const impressoMes = producao.reduce((s, p) => s + p.metrosImpressos, 0);
+  const tintaPor1000 =
+    impressoMes > 0 && tinta.total > 0 ? Math.round((tinta.total / impressoMes) * 1000 * 100) / 100 : null;
   const taxaMeta = pct(metrosFat, meta.metros);
   const conversao = pct(convertidas, decididas);
   const perdaPct = pct(perda, metrosApontados + perda);
@@ -193,6 +199,14 @@ export async function indicadoresDoMes(mes: string): Promise<Indicadores> {
       formato: "pct",
       meta: "ate 3%",
       situacao: sit(inadPct, (x) => x <= LIMITES.inadimplenciaMeta, (x) => x > LIMITES.inadimplenciaAlerta),
+    },
+    {
+      chave: "tinta_1000m",
+      nome: "Tinta por 1.000 m impressos",
+      valor: tintaPor1000,
+      formato: "numero",
+      meta: "acompanhar (L ou kg; saidas de tinta do estoque)",
+      situacao: tintaPor1000 === null ? "sem_dado" : "neutro",
     },
     {
       chave: "resultado",

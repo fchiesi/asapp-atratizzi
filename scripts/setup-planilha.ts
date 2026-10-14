@@ -3,7 +3,9 @@
  *  - locale pt_BR e fuso America/Sao_Paulo (datas DD/MM/AAAA viram data)
  *  - cria as abas que faltam (TABELAS em src/lib/planilha.ts) + _LOCK oculta
  *  - escreve o cabecalho na linha 1 SO se ela estiver vazia; congela e negrita
+ *  - coluna nova no FIM de uma aba ja existente: acrescenta o cabecalho
  *  - semeia METAS com os 12 meses do plano, se a aba estiver vazia
+ *  - semeia ITENS_ESTOQUE (CMYK de pigmento + tecido do cliente), se vazia
  * Nunca apaga aba nem dado.
  *
  * Antes: crie uma planilha vazia no Drive, compartilhe com o e-mail da
@@ -66,10 +68,18 @@ async function main() {
       await writeRange(`${tab}!A1:${ultima}1`, [cols.map((c) => c.nome)], spreadsheetId, "RAW");
       console.log(`  ${tab}: cabecalho escrito (${cols.length} colunas)`);
     } else {
-      const atual = (cab[0] ?? []).map(String);
+      const atual = (cab[0] ?? []).map((c) => String(c ?? "").trim()).filter((c, i, a) => c || a.slice(i).some(Boolean));
       const esperado = cols.map((c) => c.nome);
-      const diferente = esperado.filter((n, i) => atual[i] !== n);
-      console.log(diferente.length ? `  ${tab}: ATENCAO cabecalho difere em ${diferente.join(", ")}` : `  ${tab}: ok`);
+      const prefixoIgual = atual.every((n, i) => esperado[i] === n);
+      if (prefixoIgual && atual.length < esperado.length) {
+        // coluna nova no fim do esquema: acrescenta so o cabecalho que falta
+        const ini = letraColuna(atual.length);
+        await writeRange(`${tab}!${ini}1:${ultima}1`, [esperado.slice(atual.length)], spreadsheetId, "RAW");
+        console.log(`  ${tab}: colunas novas no fim: ${esperado.slice(atual.length).join(", ")}`);
+      } else {
+        const diferente = esperado.filter((n, i) => atual[i] !== n);
+        console.log(diferente.length ? `  ${tab}: ATENCAO cabecalho difere em ${diferente.join(", ")}` : `  ${tab}: ok`);
+      }
     }
     const sheetId = existentes.get(tab)!;
     formatos.push(
@@ -97,6 +107,13 @@ async function main() {
     // RAW: "2026-11" tem que ficar texto, nao virar data
     await writeRange(`METAS!A2:E${linhas.length + 1}`, linhas, spreadsheetId, "RAW");
     console.log(`  METAS: ${linhas.length} meses semeados a partir de ${INICIO_OPERACAO}`);
+  }
+
+  const itens = await readRange("ITENS_ESTOQUE!A2:A100", spreadsheetId);
+  if (itens.length === 0) {
+    const { criarItem, ITENS_INICIAIS } = await import("../src/lib/estoque");
+    for (const it of ITENS_INICIAIS) await criarItem(it, "setup");
+    console.log(`  ITENS_ESTOQUE: ${ITENS_INICIAIS.length} itens iniciais (${ITENS_INICIAIS.map((i) => i.nome).join(", ")})`);
   }
 
   console.log("\nPronto.");

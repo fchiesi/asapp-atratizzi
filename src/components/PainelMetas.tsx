@@ -22,7 +22,7 @@ function formatar(i: Indicador): string {
   }
 }
 
-const TOM = { ok: "ok", alerta: "alerta", atencao: "atencao", sem_dado: "neutro" } as const;
+const TOM = { ok: "ok", alerta: "alerta", atencao: "atencao", sem_dado: "neutro", neutro: "neutro" } as const;
 
 /**
  * Painel de metas + relatorio mensal (Proposta v6, pagina 6).

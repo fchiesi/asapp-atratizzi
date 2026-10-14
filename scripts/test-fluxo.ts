@@ -23,6 +23,7 @@ async function main() {
   const { hojeBR, mesAtual, somarDias, lerTabela } = await import("../src/lib/planilha");
   const { executeTool, getToolsForRole } = await import("../src/lib/tools");
   const { ErroNegocio } = await import("../src/lib/erros");
+  const est = await import("../src/lib/estoque");
 
   const quem = "teste@asapp";
   const hoje = hojeBR();
@@ -58,14 +59,14 @@ async function main() {
   const ap = await com.aprovarOrcamento("O-0001", quem);
   assert.equal(ap.pedidoId, "P-0001");
   assert.equal(ap.valorLiquido, 1720, "1800 - 80 da amostra");
-  const recP1 = await fin.listarRecebimentos({ pedidoId: "P-0001" });
+  const recP1 = await fin.listarRecebimentos({ pedidoId: "O-0001" });
   assert.deepEqual(recP1.map((r) => [r.categoria, r.valor]).sort(), [["entrada_50", 860], ["saldo_50", 860]]);
   const orc1 = (await com.listarOrcamentos()).find((o) => o.id === "O-0001");
   assert.equal(orc1?.status, "pedido");
   ok("amostra R$ 80 recebida, aprovacao gerou P-0001 de R$ 1.720 com entrada e saldo de R$ 860");
 
   const ap2 = await com.aprovarOrcamento("O-0002", quem);
-  assert.equal((await fin.listarRecebimentos({ pedidoId: ap2.pedidoId })).length, 0, "prazo28 so cobra na entrega");
+  assert.equal((await fin.listarRecebimentos({ pedidoId: "O-0002" })).length, 0, "prazo28 so cobra na entrega");
   ok(`cliente prazo28: ${ap2.pedidoId} sem cobranca na aprovacao`);
 
   // 4. producao
@@ -96,12 +97,12 @@ async function main() {
   assert.equal(p1.status, "entregue");
   assert.equal(p1.dataEntrega, hoje);
   assert.equal(p1.nf, "000123", "NF mantem zeros");
-  const saldo = (await fin.listarRecebimentos({ pedidoId: "P-0001" })).find((r) => r.categoria === "saldo_50")!;
+  const saldo = (await fin.listarRecebimentos({ pedidoId: "O-0001" })).find((r) => r.categoria === "saldo_50")!;
   assert.equal(saldo.dataVenc, hoje);
   await assert.rejects(com.alterarPedido("P-0001", { status: "na_fila" }, quem), ErroNegocio);
   await com.alterarPedido(ap2.pedidoId, { status: "entregue" }, quem);
-  const unico = (await fin.listarRecebimentos({ pedidoId: ap2.pedidoId }))[0];
-  assert.equal(unico?.categoria, "unico");
+  const unico = (await fin.listarRecebimentos({ pedidoId: "O-0002" }))[0];
+  assert.equal(unico?.categoria, "parcela_1/1");
   assert.equal(unico?.dataVenc, somarDias(hoje, 28));
   assert.equal(unico?.valor, 340);
   ok("entrega: data e NF gravadas, saldo vence hoje, prazo28 gera boleto de 28 dias");
@@ -149,7 +150,90 @@ async function main() {
   assert.match(errNeg.error, /Categoria invalida/);
   ok("tools do chat filtradas por perfil; erro de regra volta como mensagem");
 
-  // 9. a planilha guardou data como data de verdade
+  // 10. pedido manual no modelo do SApp: uma linha por desenho, parcelas 30/60
+  await assert.rejects(
+    com.criarPedido({ clienteId: "C-0001", linhas: [{ desenho: "x", servico: "pigmento", metros: 50 }], diasPgto: "abc" }, quem),
+    ErroNegocio,
+  );
+  const pm = await com.criarPedido(
+    {
+      clienteId: "C-0001",
+      pedCli: "4501",
+      diasPgto: "30/60",
+      vendedor: "Rep Teste",
+      linhas: [
+        { desenho: "Folhagem azul", tecido: "viscose", servico: "pigmento", metros: 40 },
+        { desenho: "Listras", tecido: "tricoline", servico: "pigmento", metros: 60, precoM: 17.5 },
+      ],
+    },
+    quem,
+  );
+  assert.equal(pm.pedCli, "4501");
+  assert.equal(pm.ids.length, 2);
+  assert.equal(pm.valorLiquido, 40 * 18 + 60 * 17.5);
+  await assert.rejects(
+    com.criarPedido({ clienteId: "C-0001", pedCli: "4501", linhas: [{ desenho: "y", servico: "pigmento", metros: 30 }] }, quem),
+    ErroNegocio,
+    "numero de pedido repetido",
+  );
+  const linhasPm = await com.listarPedidos({ pedCli: "4501" });
+  assert.deepEqual(linhasPm.map((l) => l.desenho).sort(), ["Folhagem azul", "Listras"]);
+  assert.equal((await fin.listarRecebimentos({ pedidoId: "4501" })).length, 0, "30/60 so cobra na entrega");
+  ok(`pedido manual 4501: 2 desenhos (${pm.ids.join(", ")}), R$ ${pm.valorLiquido}, sem cobranca antes da entrega`);
+
+  // 11. estoque: tecido do cliente libera o pedido; tinta tem saida e ajuste
+  const tecidoCli = await est.criarItem({ tipo: "tecido_cliente", nome: "Tecido do cliente", unidade: "m" }, quem);
+  const ciano = await est.criarItem({ tipo: "tinta", nome: "Pigmento Ciano", unidade: "L", minimo: 5, custoUnit: 200 }, quem);
+  await assert.rejects(est.criarItem({ tipo: "tinta", nome: "pigmento ciano" }, quem), ErroNegocio);
+  const recTec = await est.movimentar({ itemId: tecidoCli.id, tipoMov: "entrada", quantidade: 100, pedido: "4501" }, quem);
+  assert.deepEqual(recTec.pedidosLiberados.sort(), [...pm.ids].sort());
+  assert.ok((await com.listarPedidos({ pedCli: "4501" })).every((l) => l.status === "na_fila"));
+  const entTinta = await est.movimentar(
+    { itemId: ciano.id, tipoMov: "entrada", quantidade: 10, custoUnit: 210, fornecedor: "Tintas SC", vencimentoGasto: somarDias(hoje, 30) },
+    quem,
+  );
+  assert.equal(entTinta.saldo, 10);
+  assert.ok(entTinta.gastoId, "entrada com vencimento lanca conta a pagar");
+  const gastoTinta = (await fin.listarGastos({ credor: "Tintas SC" }))[0];
+  assert.equal(gastoTinta?.valor, 2100);
+  assert.equal(gastoTinta?.categoria, "tinta");
+  const said = await est.movimentar({ itemId: ciano.id, tipoMov: "saida", quantidade: 6.5, maquina: "R1" }, quem);
+  assert.equal(said.saldo, 3.5);
+  assert.ok(said.avisos.some((a) => a.includes("abaixo do minimo")));
+  const aj = await est.movimentar({ itemId: ciano.id, tipoMov: "ajuste", quantidade: 3 }, quem);
+  assert.equal(aj.saldo, 3, "ajuste grava a diferenca do inventario (-0,5)");
+  await assert.rejects(est.movimentar({ itemId: ciano.id, tipoMov: "ajuste", quantidade: 3 }, quem), ErroNegocio);
+  const itensEst = await est.listarItens();
+  const cianoLido = itensEst.find((i) => i.id === ciano.id)!;
+  assert.equal(cianoLido.saldo, 3);
+  assert.equal(cianoLido.custoUnit, 210, "entrada com preco novo atualiza o custo");
+  assert.equal(cianoLido.abaixoMinimo, true);
+  assert.equal(itensEst.find((i) => i.id === tecidoCli.id)!.valorSaldo, 0, "tecido do cliente nao tem valor nosso");
+  const consumo = await est.consumoTintaNoMes(mesAtual());
+  assert.equal(consumo.total, 6.5);
+  assert.equal(consumo.porMaquina.R1, 6.5);
+  ok("estoque: tecido do cliente liberou o pedido, entrada lancou conta, saida/ajuste e alerta de minimo");
+
+  // 12. entrega do pedido manual: parcelas so quando o ULTIMO desenho sai
+  const [l1, l2] = pm.ids;
+  await com.alterarPedido(l1, { status: "entregue" }, quem);
+  assert.equal((await fin.listarRecebimentos({ pedidoId: "4501" })).length, 0, "falta um desenho");
+  await com.alterarPedido(l2, { status: "entregue", nf: "000777" }, quem);
+  const parcelas = await fin.listarRecebimentos({ pedidoId: "4501" });
+  assert.deepEqual(
+    parcelas.map((r) => [r.categoria, r.valor, r.dataVenc]),
+    [
+      ["parcela_1/2", 885, somarDias(hoje, 30)],
+      ["parcela_2/2", 885, somarDias(hoje, 60)],
+    ],
+  );
+  assert.equal(parcelas[0].nf, "000777");
+  const indDepois = await indicadoresDoMes(mesAtual());
+  const tinta1000 = indDepois.indicadores.find((i) => i.chave === "tinta_1000m")!;
+  assert.equal(tinta1000.valor, Math.round((6.5 / 115) * 1000 * 100) / 100, "6,5 L em 115 m impressos");
+  ok(`entrega do 2o desenho gerou 2 parcelas de R$ 885 (30 e 60 dias); tinta ${tinta1000.valor} L/1.000 m`);
+
+  // 13. a planilha guardou data como data de verdade
   const g = abas.get("PEDIDOS")!;
   assert.equal(typeof g[1][1], "number", "DATA virou serial");
   assert.equal((await lerTabela("PEDIDOS"))[0].DATA, hoje, "e volta como DD/MM/AAAA");

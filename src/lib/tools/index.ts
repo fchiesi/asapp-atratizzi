@@ -10,6 +10,7 @@ import {
   listarRecebimentos,
 } from "@/lib/financeiro";
 import { painelProducao } from "@/lib/producao";
+import { listarItens, listarMovimentos } from "@/lib/estoque";
 import { indicadoresDoMes } from "@/lib/metas";
 import { lerTabela, mesAtual, noMes } from "@/lib/planilha";
 import { CATEGORIAS_GASTO, STATUS_ORCAMENTO, STATUS_PEDIDO } from "@/lib/config";
@@ -92,6 +93,27 @@ const TOOLS: Record<string, { definition: Tool; handler: Handler }> = {
       if (!mes) return painel;
       const paradas = (await lerTabela("PARADAS")).filter((p) => noMes(p.DATA, mes));
       return { ...painel, paradasDoMes: paradas };
+    },
+  },
+  consultar_estoque: {
+    definition: {
+      name: "consultar_estoque",
+      description:
+        "Saldos do estoque (tintas, tecidos proprios, tecido do cliente, insumos) com estoque minimo e alerta de abaixo do minimo. Com item_id, devolve tambem os movimentos daquele item (entrada, saida, ajuste).",
+      input_schema: {
+        type: "object",
+        properties: {
+          tipo: { type: "string", enum: ["tinta", "tecido", "tecido_cliente", "insumo"] },
+          item_id: { type: "string", description: "ID do item (E-0001) para ver os movimentos." },
+          mes: mesArg,
+        },
+      },
+    },
+    handler: async (i) => {
+      const itens = await listarItens({ tipo: s(i.tipo) });
+      const itemId = s(i.item_id);
+      if (!itemId) return { ...corta(itens), abaixo_do_minimo: itens.filter((x) => x.abaixoMinimo).map((x) => x.nome) };
+      return { item: itens.find((x) => x.id === itemId) ?? null, movimentos: corta(await listarMovimentos({ itemId, mes: s(i.mes) })) };
     },
   },
   consultar_gastos: {

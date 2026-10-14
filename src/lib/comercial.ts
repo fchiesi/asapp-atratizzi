@@ -9,7 +9,10 @@ import {
 } from "@/lib/planilha";
 import {
   avisosMinimo,
+  CONDICAO_50_50,
   CONDICOES,
+  diasPgtoPadrao,
+  parcelasDe,
   precoSugerido,
   servicoPorId,
   STATUS_PEDIDO,
@@ -261,10 +264,9 @@ export async function marcarPerdido(id: string, motivo: string): Promise<void> {
 }
 
 /**
- * Aprova o orcamento e gera o pedido.
- * - desconto da amostra so se a amostra ja foi recebida
- * - cliente "novo": nasce entrada 50% (vence hoje) e saldo 50% (vence no prazo)
- * - cliente "prazo28": a conta nasce na entrega (28 dias)
+ * Aprova o orcamento e gera o pedido (uma linha, PED_CLI = numero do
+ * orcamento). Desconto da amostra so se ela ja foi recebida. A condicao de
+ * pagamento vem do cadastro do cliente (50/50 ou 28 dias).
  */
 export async function aprovarOrcamento(
   id: string,
@@ -285,56 +287,206 @@ export async function aprovarOrcamento(
     if (receb && receb.STATUS === "recebido") desconto = Number(receb.VALOR);
     else avisos.push("Amostra ainda nao recebida: pedido gerado sem o desconto da amostra.");
   }
-  const valorLiquido = r2(Math.max(0, o.valor - desconto));
 
   const hoje = hojeBR();
-  const prazoDias = o.urgente ? 3 : (serv?.prazoDias ?? 7);
-  // dias uteis aproximados: +40% em dias corridos
-  const prazo = opts.prazo && isValidDateBR(opts.prazo) ? opts.prazo : somarDias(hoje, Math.ceil(prazoDias * 1.4));
-
-  const { id: pedidoId } = await inserir(
-    "PEDIDOS",
+  const prazo = opts.prazo && isValidDateBR(opts.prazo) ? opts.prazo : prazoPadrao(hoje, serv?.prazoDias, o.urgente);
+  const r = await gravarPedido(
     {
-      DATA: hoje,
-      CLIENTE_ID: cli.id,
-      CLIENTE: cli.nome,
-      ORCAMENTO_ID: o.id,
-      SERVICO: o.servico,
-      TECIDO: o.tecido,
-      ESTAMPAS: o.estampas,
-      METROS: o.metros,
-      PRECO_M: o.precoM,
-      URGENTE: o.urgente ? "S" : "N",
-      VALOR: o.valor,
-      DESCONTO_AMOSTRA: desconto,
-      VALOR_LIQUIDO: valorLiquido,
-      PRAZO: prazo,
-      STATUS: "aguardando_tecido",
-      VENDEDOR: o.vendedor,
-      OBS: o.obs,
-      CRIADO_POR: quem,
+      cliente: cli,
+      pedCli: o.id,
+      orcamentoId: o.id,
+      prazo,
+      urgente: o.urgente,
+      diasPgto: diasPgtoPadrao(cli.condicao),
+      vendedor: o.vendedor,
+      obs: o.obs,
+      desconto,
+      linhas: [
+        { desenho: "", tecido: o.tecido, servico: o.servico, estampas: o.estampas, metros: o.metros, precoM: o.precoM },
+      ],
     },
     quem,
   );
-  await atualizar("ORCAMENTOS", id, { STATUS: "pedido", PEDIDO_ID: pedidoId });
-
-  if (cli.condicao === "novo" && valorLiquido > 0) {
-    const metade = r2(valorLiquido / 2);
-    const base = { CLIENTE: cli.nome, PEDIDO_ID: pedidoId, ORCAMENTO_ID: o.id, STATUS: "aberto", ORIGEM: "app" };
-    await inserir("RECEBIMENTOS", { ...base, DATA_EMISSAO: hoje, DATA_VENC: hoje, TIPO: "entrada_50", VALOR: metade }, quem);
-    await inserir(
-      "RECEBIMENTOS",
-      { ...base, DATA_EMISSAO: hoje, DATA_VENC: prazo, TIPO: "saldo_50", VALOR: r2(valorLiquido - metade) },
-      quem,
-    );
-  }
-  return { pedidoId, valorLiquido, avisos };
+  await atualizar("ORCAMENTOS", id, { STATUS: "pedido", PEDIDO_ID: r.ids[0] });
+  return { pedidoId: r.ids[0], valorLiquido: r.valorLiquido, avisos };
 }
 
-// ── Pedidos ────────────────────────────────────────────────────────────────
+// ── Pedidos (modelo do SApp: uma linha por pedido + desenho) ───────────────
+
+/** Prazo padrao: dias uteis do servico (+40% em dias corridos); urgente 3 dias. */
+function prazoPadrao(hoje: string, prazoDias = 7, urgente = false): string {
+  return somarDias(hoje, Math.ceil((urgente ? 3 : prazoDias) * 1.4));
+}
+
+export interface LinhaPedido {
+  desenho: string;
+  tecido?: string;
+  servico: string;
+  estampas?: number;
+  metros: number;
+  precoM?: number;
+}
+
+export interface NovoPedido {
+  clienteId: string;
+  /** numero do pedido (do cliente ou interno); vazio = usa o numero da 1a linha */
+  pedCli?: string;
+  prazo?: string;
+  urgente?: boolean;
+  /** "50/50", "28", "30/60/90"... vazio = padrao do cliente */
+  diasPgto?: string;
+  vendedor?: string;
+  obs?: string;
+  linhas: LinhaPedido[];
+}
+
+interface PedidoParaGravar {
+  cliente: Cliente;
+  pedCli: string;
+  orcamentoId: string;
+  prazo: string;
+  urgente: boolean;
+  diasPgto: string;
+  vendedor: string;
+  obs: string;
+  desconto: number;
+  linhas: LinhaPedido[];
+}
+
+/**
+ * Grava as linhas do pedido e, se a condicao for 50/50, a entrada (vence
+ * hoje) e o saldo (vence no prazo) sobre o TOTAL do pedido. Parcelas por
+ * dias ("28", "30/60/90") nascem quando a ultima linha e' entregue.
+ * O desconto da amostra sai da primeira linha.
+ */
+async function gravarPedido(
+  p: PedidoParaGravar,
+  quem: string,
+): Promise<{ ids: string[]; pedCli: string; valorLiquido: number }> {
+  const hoje = hojeBR();
+  const ids: string[] = [];
+  let pedCli = p.pedCli;
+  let total = 0;
+  for (const [i, l] of p.linhas.entries()) {
+    const precoM = l.precoM ?? precoSugerido(l.servico, p.urgente);
+    const valor = r2(l.metros * precoM);
+    const desconto = i === 0 ? Math.min(p.desconto, valor) : 0;
+    const liquido = r2(valor - desconto);
+    total += liquido;
+    const { id } = await inserir(
+      "PEDIDOS",
+      {
+        DATA: hoje,
+        CLIENTE_ID: p.cliente.id,
+        CLIENTE: p.cliente.nome,
+        ORCAMENTO_ID: p.orcamentoId,
+        SERVICO: l.servico,
+        TECIDO: texto(l.tecido),
+        ESTAMPAS: l.estampas ?? 1,
+        METROS: l.metros,
+        PRECO_M: precoM,
+        URGENTE: p.urgente ? "S" : "N",
+        VALOR: valor,
+        DESCONTO_AMOSTRA: desconto,
+        VALOR_LIQUIDO: liquido,
+        PRAZO: p.prazo,
+        STATUS: "aguardando_tecido",
+        VENDEDOR: p.vendedor,
+        OBS: p.obs,
+        CRIADO_POR: quem,
+        PED_CLI: pedCli,
+        DESENHO: texto(l.desenho),
+        DIAS_PGTO: p.diasPgto,
+      },
+      quem,
+    );
+    ids.push(id);
+    if (!pedCli) {
+      // sem numero informado: o pedido passa a ser conhecido pela 1a linha
+      pedCli = id;
+      await atualizar("PEDIDOS", id, { PED_CLI: id });
+    }
+  }
+  total = r2(total);
+
+  if (p.diasPgto === CONDICAO_50_50 && total > 0) {
+    const metade = r2(total / 2);
+    const base = {
+      CLIENTE: p.cliente.nome,
+      PEDIDO_ID: pedCli,
+      ORCAMENTO_ID: p.orcamentoId,
+      STATUS: "aberto",
+      ORIGEM: "app",
+      DATA_EMISSAO: hoje,
+    };
+    await inserir("RECEBIMENTOS", { ...base, DATA_VENC: hoje, TIPO: "entrada_50", VALOR: metade }, quem);
+    await inserir("RECEBIMENTOS", { ...base, DATA_VENC: p.prazo, TIPO: "saldo_50", VALOR: r2(total - metade) }, quem);
+  }
+  return { ids, pedCli, valorLiquido: total };
+}
+
+/** Entrada manual de pedido (sem orcamento), com uma linha por desenho. */
+export async function criarPedido(
+  n: NovoPedido,
+  quem: string,
+): Promise<{ ids: string[]; pedCli: string; valorLiquido: number; avisos: string[] }> {
+  const cli = await acharCliente(texto(n.clienteId));
+  exigir(Array.isArray(n.linhas) && n.linhas.length > 0, "O pedido precisa de pelo menos uma linha (desenho).");
+  const avisos: string[] = [];
+  const linhas: LinhaPedido[] = n.linhas.map((l, i) => {
+    const serv = servicoPorId(texto(l.servico));
+    exigir(serv, `Linha ${i + 1}: servico invalido (${l.servico}).`);
+    const metros = numeroPositivo(l.metros, `Linha ${i + 1}: metros`);
+    const estampas = Math.max(1, Math.floor(Number(l.estampas ?? 1)) || 1);
+    for (const a of avisosMinimo(serv.id, metros, estampas)) avisos.push(`Linha ${i + 1}: ${a}`);
+    return {
+      desenho: texto(l.desenho),
+      tecido: texto(l.tecido),
+      servico: serv.id,
+      estampas,
+      metros,
+      precoM: l.precoM ? numeroPositivo(l.precoM, `Linha ${i + 1}: preco por metro`) : undefined,
+    };
+  });
+
+  const pedCli = texto(n.pedCli);
+  if (pedCli) {
+    const existe = (await lerTabela("PEDIDOS", { fresco: true })).some((r) => String(r.PED_CLI) === pedCli);
+    exigir(!existe, `Ja existe pedido com o numero ${pedCli}.`);
+  }
+  const diasPgto = texto(n.diasPgto) || diasPgtoPadrao(cli.condicao);
+  exigir(
+    diasPgto === CONDICAO_50_50 || parcelasDe(diasPgto),
+    `Condicao de pagamento invalida: ${diasPgto}. Use 50/50 ou dias como 28 ou 30/60/90.`,
+  );
+  const prazo = texto(n.prazo);
+  exigir(!prazo || isValidDateBR(prazo), "Prazo deve ser DD/MM/AAAA.");
+  const urgente = !!n.urgente;
+
+  const r = await gravarPedido(
+    {
+      cliente: cli,
+      pedCli,
+      orcamentoId: "",
+      prazo: prazo || prazoPadrao(hojeBR(), servicoPorId(linhas[0].servico)?.prazoDias, urgente),
+      urgente,
+      diasPgto,
+      vendedor: texto(n.vendedor) || cli.vendedor || quem,
+      obs: texto(n.obs),
+      desconto: 0,
+      linhas,
+    },
+    quem,
+  );
+  return { ...r, avisos };
+}
 
 export interface Pedido {
   id: string;
+  /** numero do pedido: agrupa as linhas (desenhos) e e' a chave no financeiro */
+  pedCli: string;
+  desenho: string;
+  diasPgto: string;
   data: string;
   clienteId: string;
   cliente: string;
@@ -361,7 +513,7 @@ export interface Pedido {
 }
 
 export async function listarPedidos(
-  f: { status?: string; abertos?: boolean; cliente?: string } = {},
+  f: { status?: string; abertos?: boolean; cliente?: string; pedCli?: string } = {},
 ): Promise<Pedido[]> {
   const [rows, aptos] = await Promise.all([lerTabela("PEDIDOS"), lerTabela("APONTAMENTOS")]);
   const impressos = new Map<string, number>();
@@ -377,6 +529,9 @@ export async function listarPedidos(
     const fechado = status === "entregue" || status === "cancelado";
     return {
       id: String(r.ID),
+      pedCli: String(r.PED_CLI) || String(r.ID),
+      desenho: String(r.DESENHO),
+      diasPgto: String(r.DIAS_PGTO),
       data: String(r.DATA),
       clienteId: String(r.CLIENTE_ID),
       cliente: String(r.CLIENTE),
@@ -403,6 +558,7 @@ export async function listarPedidos(
   });
   if (f.status) lista = lista.filter((p) => p.status === f.status);
   if (f.abertos) lista = lista.filter((p) => p.status !== "entregue" && p.status !== "cancelado");
+  if (f.pedCli) lista = lista.filter((p) => p.pedCli === f.pedCli);
   if (f.cliente) {
     const q = f.cliente.toLowerCase();
     lista = lista.filter((p) => p.cliente.toLowerCase().includes(q) || p.clienteId === f.cliente);
@@ -419,10 +575,11 @@ export interface AlteracaoPedido {
 }
 
 /**
- * Muda status/maquina/NF/prazo. Ao marcar "entregue":
- * - grava DATA_ENTREGA = hoje
- * - cliente novo: saldo 50% passa a vencer hoje
- * - cliente prazo28: nasce o boleto de 28 dias
+ * Muda status/maquina/NF/prazo de uma linha. Ao marcar "entregue" grava
+ * DATA_ENTREGA = hoje. Quando a ULTIMA linha do pedido (PED_CLI) sai:
+ * - 50/50: o saldo passa a vencer hoje
+ * - dias ("28", "30/60/90"): nascem as parcelas sobre o total do pedido
+ * Linha cancelada nao entra na conta nem segura a entrega do resto.
  */
 export async function alterarPedido(id: string, alt: AlteracaoPedido, quem: string): Promise<void> {
   const pedido = (await listarPedidos()).find((p) => p.id === id);
@@ -444,30 +601,47 @@ export async function alterarPedido(id: string, alt: AlteracaoPedido, quem: stri
   const hoje = hojeBR();
   if (entregandoAgora) patch.DATA_ENTREGA = hoje;
   await atualizar("PEDIDOS", id, patch);
+  if (!entregandoAgora) return;
 
-  if (entregandoAgora && pedido.valorLiquido > 0) {
-    const cli = await acharCliente(pedido.clienteId);
-    const recebs = await lerTabela("RECEBIMENTOS", { fresco: true });
-    if (cli.condicao === "novo") {
-      const saldo = recebs.find((r) => r.PEDIDO_ID === id && r.TIPO === "saldo_50" && r.STATUS === "aberto");
-      if (saldo) await atualizar("RECEBIMENTOS", String(saldo.ID), { DATA_VENC: hoje });
-    } else if (!recebs.some((r) => r.PEDIDO_ID === id && r.TIPO === "unico")) {
-      await inserir(
-        "RECEBIMENTOS",
-        {
-          DATA_EMISSAO: hoje,
-          DATA_VENC: somarDias(hoje, 28),
-          CLIENTE: pedido.cliente,
-          PEDIDO_ID: id,
-          ORCAMENTO_ID: pedido.orcamentoId,
-          TIPO: "unico",
-          NF: alt.nf ?? pedido.nf,
-          VALOR: pedido.valorLiquido,
-          STATUS: "aberto",
-          ORIGEM: "app",
-        },
-        quem,
-      );
-    }
+  // a linha recem-entregue ainda pode aparecer com o status antigo no cache
+  const grupo = (await listarPedidos({ pedCli: pedido.pedCli })).map((p) =>
+    p.id === id ? { ...p, status: "entregue" as const } : p,
+  );
+  const ativas = grupo.filter((p) => p.status !== "cancelado");
+  if (!ativas.every((p) => p.status === "entregue")) return;
+  const total = r2(ativas.reduce((s, p) => s + p.valorLiquido, 0));
+  if (total <= 0) return;
+
+  const recebs = (await lerTabela("RECEBIMENTOS", { fresco: true })).filter((r) => r.PEDIDO_ID === pedido.pedCli);
+  // linha antiga sem DIAS_PGTO: segue a condicao do cliente
+  const diasPgto = pedido.diasPgto || diasPgtoPadrao((await acharCliente(pedido.clienteId)).condicao);
+  const parcelas = parcelasDe(diasPgto);
+  if (!parcelas) {
+    const saldo = recebs.find((r) => r.TIPO === "saldo_50" && r.STATUS === "aberto");
+    if (saldo) await atualizar("RECEBIMENTOS", String(saldo.ID), { DATA_VENC: hoje });
+    return;
+  }
+  if (recebs.some((r) => String(r.TIPO).startsWith("parcela"))) return;
+  const nf = alt.nf ?? pedido.nf;
+  let resto = total;
+  for (const [i, dias] of parcelas.entries()) {
+    const valor = i === parcelas.length - 1 ? r2(resto) : r2(total / parcelas.length);
+    resto -= valor;
+    await inserir(
+      "RECEBIMENTOS",
+      {
+        DATA_EMISSAO: hoje,
+        DATA_VENC: somarDias(hoje, dias),
+        CLIENTE: pedido.cliente,
+        PEDIDO_ID: pedido.pedCli,
+        ORCAMENTO_ID: pedido.orcamentoId,
+        TIPO: `parcela_${i + 1}/${parcelas.length}`,
+        NF: nf,
+        VALOR: valor,
+        STATUS: "aberto",
+        ORIGEM: "app",
+      },
+      quem,
+    );
   }
 }

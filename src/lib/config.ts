@@ -98,6 +98,45 @@ export const CONDICAO_LABEL: Record<Condicao, string> = {
   prazo28: "Boleto 28 dias",
 };
 
+/**
+ * Condicao de pagamento do pedido (coluna DIAS_PGTO, como no SApp):
+ * - "50/50": 50% na aprovacao + 50% na entrega (cliente novo)
+ * - "28", "30/60/90"...: parcelas iguais contadas da entrega
+ */
+export const CONDICAO_50_50 = "50/50";
+
+/** "30/60/90" -> [30, 60, 90]; "50/50" ou invalido -> null. */
+export function parcelasDe(diasPgto: string): number[] | null {
+  const s = String(diasPgto ?? "").trim();
+  if (!s || s === CONDICAO_50_50) return null;
+  const dias = s.split(/[/;, ]+/).map(Number);
+  return dias.length && dias.every((d) => Number.isInteger(d) && d >= 0 && d <= 365) ? dias : null;
+}
+
+/** Condicao padrao do pedido a partir do cadastro do cliente. */
+export function diasPgtoPadrao(condicao: Condicao): string {
+  return condicao === "prazo28" ? "28" : CONDICAO_50_50;
+}
+
+// ── Estoque ────────────────────────────────────────────────────────────────
+
+/**
+ * tecido_cliente: tecido que o cliente manda para estampar. Entra e sai do
+ * estoque fisico mas NAO tem custo nosso; a entrada ligada a um pedido
+ * libera o pedido de "aguardando tecido" para "na fila".
+ */
+export const TIPOS_ITEM = ["tinta", "tecido", "tecido_cliente", "insumo"] as const;
+export type TipoItem = (typeof TIPOS_ITEM)[number];
+export const TIPO_ITEM_LABEL: Record<TipoItem, string> = {
+  tinta: "Tinta",
+  tecido: "Tecido proprio",
+  tecido_cliente: "Tecido do cliente",
+  insumo: "Insumo",
+};
+export const UNIDADES_ESTOQUE = ["L", "kg", "m", "un"] as const;
+export const TIPOS_MOV = ["entrada", "saida", "ajuste"] as const;
+export type TipoMov = (typeof TIPOS_MOV)[number];
+
 export const STATUS_ORCAMENTO = ["aberto", "amostra", "aprovado", "perdido", "pedido"] as const;
 export type StatusOrcamento = (typeof STATUS_ORCAMENTO)[number];
 
