@@ -1,5 +1,5 @@
 import { lerTabela, noMes, ordinal } from "@/lib/planilha";
-import { LIMITES, MAQUINAS, METAS_PADRAO, PRECO_MINIMO_M } from "@/lib/config";
+import { CUSTO_VARIAVEL_M, LIMITES, MAQUINAS, METAS_PADRAO, PRECO_MINIMO_M } from "@/lib/config";
 import { resumoFinanceiro } from "@/lib/financeiro";
 
 /**
@@ -215,6 +215,9 @@ export async function indicadoresDoMes(mes: string): Promise<Indicadores> {
       aPagar: fin.aPagarAberto,
       inadimplente: fin.inadimplencia.valor,
     },
-    pontoEquilibrioMetros: Math.ceil(meta.custoFixo / (precoMedio ?? meta.precoMedio)),
+    // metros para empatar: custo fixo / margem por metro (preco - custo variavel)
+    pontoEquilibrioMetros: Math.ceil(
+      meta.custoFixo / Math.max((precoMedio ?? meta.precoMedio) - CUSTO_VARIAVEL_M, 0.01),
+    ),
   };
 }

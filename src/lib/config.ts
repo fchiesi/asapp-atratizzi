@@ -179,6 +179,14 @@ export const METAS_PADRAO = {
   metrosPorMesDaOperacao: [4000, 4000, 5500, 5500, 7500, 8000, 8000, 8000, 8000, 9000, 10000, 12000],
 } as const;
 
+/**
+ * Custo variavel por metro (tinta, pre-tratamento, energia da maquina...).
+ * Derivado da propria proposta: R$ 50.500 empata em 6.400 m e R$ 56.000 em
+ * 7.100 m a R$ 17/m -> margem de ~R$ 7,89/m -> variavel ~R$ 9,11/m.
+ * Troque pelo valor da planilha Custo_por_metro quando ela for revisada.
+ */
+export const CUSTO_VARIAVEL_M = 9.11;
+
 /** Indicadores da proposta (pagina 6): meta e alerta. */
 export const LIMITES = {
   conversaoAmostraMeta: 0.3,
