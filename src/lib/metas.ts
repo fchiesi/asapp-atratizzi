@@ -128,7 +128,8 @@ export async function indicadoresDoMes(mes: string): Promise<Indicadores> {
   const causas = new Map<string, number>();
   for (const p of paradasMes) causas.set(String(p.CAUSA), (causas.get(String(p.CAUSA)) ?? 0) + Number(p.HORAS));
 
-  const r1 = producao.find((p) => p.maquina === "R1")!;
+  // paradas por maquina ficam so na tabela "Maquinas no mes" (sem card
+  // proprio no painel - pedido do Fernando, 19/10/2026)
   const impressoMes = producao.reduce((s, p) => s + p.metrosImpressos, 0);
   const tintaPor1000 =
     impressoMes > 0 && tinta.total > 0 ? Math.round((tinta.total / impressoMes) * 1000 * 100) / 100 : null;
@@ -167,14 +168,6 @@ export async function indicadoresDoMes(mes: string): Promise<Indicadores> {
       formato: "pct",
       meta: "30% ou mais",
       situacao: sit(conversao, (x) => x >= LIMITES.conversaoAmostraMeta, (x) => x < LIMITES.conversaoAmostraAlerta),
-    },
-    {
-      chave: "paradas_r1",
-      nome: "Dias de parada da Reggiani 1",
-      valor: r1.diasParados,
-      formato: "dias",
-      meta: "registrar todos; alerta acima de 3",
-      situacao: r1.diasParados > LIMITES.diasParadaAlerta ? "alerta" : "ok",
     },
     {
       chave: "perdas",

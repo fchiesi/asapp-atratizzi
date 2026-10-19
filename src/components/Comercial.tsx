@@ -12,9 +12,9 @@ import {
   servicoPorId,
   TECIDOS,
   VALOR_AMOSTRA,
-  type Condicao,
 } from "@/lib/config";
 import { api } from "@/lib/cliente-api";
+import { ClienteNovo, EscolherCliente } from "./ClienteNovo";
 import { Aviso, Botao, Cabecalho, Campo, Card, Carregando, Etiqueta, inputCls, Pagina } from "./ui";
 
 const COR_STATUS: Record<string, "cinza" | "verde" | "vermelho" | "amarelo" | "azul"> = {
@@ -118,7 +118,8 @@ export function Comercial({ podeEditar }: { podeEditar: boolean }) {
         <div className="grid lg:grid-cols-[380px_1fr] gap-4 items-start">
           {podeEditar && (
             <NovoOrcamento
-              clientes={clientes ?? []}
+              clientes={clientes}
+              onClienteNovo={(c) => setClientes((l) => [...(l ?? []), c].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")))}
               onCriado={(t) => {
                 setMsg({ tipo: "ok", texto: t });
                 carregar();
@@ -186,13 +187,14 @@ export function Comercial({ podeEditar }: { podeEditar: boolean }) {
       {aba === "clientes" && (
         <div className="grid lg:grid-cols-[380px_1fr] gap-4 items-start">
           {podeEditar && (
-            <NovoCliente
-              onCriado={(t) => {
-                setMsg({ tipo: "ok", texto: t });
-                carregar();
-              }}
-              onErro={(t) => setMsg({ tipo: "erro", texto: t })}
-            />
+            <Card titulo="Novo cliente">
+              <ClienteNovo
+                onCriado={(c) => {
+                  setMsg({ tipo: "ok", texto: `Cliente ${c.nome} cadastrado (${c.id}).` });
+                  carregar();
+                }}
+              />
+            </Card>
           )}
           <Card titulo={`Clientes (${clientes?.length ?? 0})`}>
             {!clientes ? (
@@ -226,10 +228,12 @@ export function Comercial({ podeEditar }: { podeEditar: boolean }) {
 
 function NovoOrcamento({
   clientes,
+  onClienteNovo,
   onCriado,
   onErro,
 }: {
-  clientes: Cliente[];
+  clientes: Cliente[] | null;
+  onClienteNovo: (c: Cliente) => void;
   onCriado: (msg: string) => void;
   onErro: (msg: string) => void;
 }) {
@@ -278,17 +282,7 @@ function NovoOrcamento({
   return (
     <Card titulo="Novo orcamento">
       <form onSubmit={salvar} className="space-y-3">
-        <Campo rotulo="Cliente">
-          <select required value={clienteId} onChange={(e) => setClienteId(e.target.value)} className={inputCls}>
-            <option value="">Escolha...</option>
-            {clientes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nome}
-              </option>
-            ))}
-          </select>
-        </Campo>
-        {clientes.length === 0 && <p className="text-xs text-gray-500">Cadastre o cliente na aba Clientes.</p>}
+        <EscolherCliente clientes={clientes} value={clienteId} onChange={setClienteId} onClienteNovo={onClienteNovo} />
         <Campo rotulo="Servico">
           <select value={servico} onChange={(e) => setServico(e.target.value)} className={inputCls}>
             {SERVICOS.map((s) => (
@@ -343,72 +337,6 @@ function NovoOrcamento({
             {a}
           </Aviso>
         ))}
-      </form>
-    </Card>
-  );
-}
-
-function NovoCliente({ onCriado, onErro }: { onCriado: (msg: string) => void; onErro: (msg: string) => void }) {
-  const vazio = { nome: "", documento: "", cidade: "Blumenau", contato: "", telefone: "", email: "", condicao: "novo", obs: "" };
-  const [f, setF] = useState(vazio);
-  const [salvando, setSalvando] = useState(false);
-  const set = (k: keyof typeof vazio) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setF({ ...f, [k]: e.target.value });
-
-  async function salvar(e: React.FormEvent) {
-    e.preventDefault();
-    setSalvando(true);
-    try {
-      const r = await api<{ id: string }>("/api/clientes", { body: f });
-      onCriado(`Cliente ${f.nome} cadastrado (${r.id}).`);
-      setF(vazio);
-    } catch (err) {
-      onErro(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSalvando(false);
-    }
-  }
-
-  return (
-    <Card titulo="Novo cliente">
-      <form onSubmit={salvar} className="space-y-3">
-        <Campo rotulo="Nome / razao social">
-          <input required value={f.nome} onChange={set("nome")} className={inputCls} />
-        </Campo>
-        <div className="grid grid-cols-2 gap-3">
-          <Campo rotulo="CNPJ / CPF">
-            <input value={f.documento} onChange={set("documento")} className={inputCls} />
-          </Campo>
-          <Campo rotulo="Cidade">
-            <input value={f.cidade} onChange={set("cidade")} className={inputCls} />
-          </Campo>
-          <Campo rotulo="Contato">
-            <input value={f.contato} onChange={set("contato")} className={inputCls} />
-          </Campo>
-          <Campo rotulo="Telefone">
-            <input value={f.telefone} onChange={set("telefone")} className={inputCls} />
-          </Campo>
-        </div>
-        <Campo rotulo="E-mail">
-          <input type="email" value={f.email} onChange={set("email")} className={inputCls} />
-        </Campo>
-        <Campo rotulo="Condicao de pagamento">
-          <select value={f.condicao} onChange={set("condicao")} className={inputCls}>
-            {(Object.keys(CONDICAO_LABEL) as Condicao[]).map((c) => (
-              <option key={c} value={c}>
-                {CONDICAO_LABEL[c]}
-              </option>
-            ))}
-          </select>
-        </Campo>
-        <Campo rotulo="Observacao">
-          <input value={f.obs} onChange={set("obs")} className={inputCls} />
-        </Campo>
-        <div className="flex justify-end">
-          <Botao type="submit" disabled={salvando}>
-            {salvando ? "Salvando..." : "Cadastrar"}
-          </Botao>
-        </div>
       </form>
     </Card>
   );

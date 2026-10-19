@@ -8,8 +8,8 @@ Google Sheets via Service Account, chat com Claude), com módulos pensados para 
 
 | Tela | Para quem | O que faz |
 |---|---|---|
-| `/painel` | diretoria, administrativo, sócios | Metas do mês: metros faturados × meta e ponto de equilíbrio, preço médio, conversão de amostra, dias de parada da R1, perdas, entregas no prazo, inadimplência, resultado de caixa. Botão **Imprimir relatório** (relatório mensal aos sócios). |
-| `/comercial` | vendedor, administrativo, diretoria | Clientes e orçamentos. Preço sugerido por serviço, +20% urgente, aviso de pedido mínimo. Fluxo **orçamento → amostra cobrada (R$ 80) → aprovar → pedido**. |
+| `/painel` | diretoria, administrativo, sócios | Metas do mês: metros faturados × meta e ponto de equilíbrio, preço médio, conversão de amostra, perdas, entregas no prazo, inadimplência, resultado de caixa. Botão **Imprimir relatório** (relatório mensal aos sócios). |
+| `/comercial` | vendedor, administrativo, diretoria | Clientes (cadastro curto: nome, telefone, pagamento; o resto em "Mais dados") e orçamentos. Orçamento e pedido têm **+ Novo** para cadastrar o cliente sem sair da tela. Preço sugerido por serviço, +20% urgente, aviso de pedido mínimo. Fluxo **orçamento → amostra cobrada (R$ 80) → aprovar → pedido**. |
 | `/pedidos` | idem + produção | **Novo pedido** no modelo do SApp: nº do pedido do cliente, entrega, pagamento (50/50, 28, 30/60/90), representante e **uma linha por desenho**. Lista com metros impressos × pedidos, prazo, atraso, status, máquina, NF e **Entregue**. |
 | `/producao` | produção (celular) | Metros por Reggiani hoje, **flush** com motivo (troca de tinta ou entupimento - não é diário) e último flush, rodada semanal da R2, **apontamento** (pedido, máquina, etapa, metros, perda), **parada** (horas e causa), fila. |
 | `/estoque` | produção, administrativo, diretoria (sócios leem) | Tintas, tecidos próprios, tecido do cliente e insumos: saldo (soma dos movimentos) com alerta de mínimo, **entrada** (com opção de lançar a conta a pagar), **saída/consumo** (tinta por máquina), **ajuste de inventário** (informa o saldo contado), cadastro de item. |

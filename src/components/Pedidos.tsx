@@ -19,6 +19,7 @@ import {
   type StatusPedido,
 } from "@/lib/config";
 import { api } from "@/lib/cliente-api";
+import { EscolherCliente } from "./ClienteNovo";
 import { Aviso, Botao, Cabecalho, Campo, Card, Carregando, Etiqueta, inputCls, Numero, Pagina } from "./ui";
 
 const COR: Record<StatusPedido, "cinza" | "verde" | "vermelho" | "amarelo" | "azul"> = {
@@ -274,6 +275,7 @@ function NovoPedidoForm({ onCriado, onErro }: { onCriado: (t: string) => void; o
   const [salvando, setSalvando] = useState(false);
 
   const [erroClientes, setErroClientes] = useState<string | null>(null);
+  const [maisDetalhes, setMaisDetalhes] = useState(false);
 
   // uma vez ao abrir o formulario
   useEffect(() => {
@@ -333,20 +335,15 @@ function NovoPedidoForm({ onCriado, onErro }: { onCriado: (t: string) => void; o
     <Card titulo="Novo pedido" className="mb-4">
       <form onSubmit={salvar} className="space-y-4">
         {erroClientes && <Aviso tipo="erro">Nao carregou os clientes: {erroClientes}</Aviso>}
-        {clientes?.length === 0 && (
-          <Aviso tipo="info">Nenhum cliente cadastrado. Cadastre em Orcamentos e clientes → Clientes.</Aviso>
-        )}
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <Campo rotulo="Cliente">
-            <select required value={clienteId} onChange={(e) => setClienteId(e.target.value)} className={inputCls}>
-              <option value="">{clientes ? "Escolha..." : "Carregando..."}</option>
-              {clientes?.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nome}
-                </option>
-              ))}
-            </select>
-          </Campo>
+          <div className="sm:col-span-2">
+            <EscolherCliente
+              clientes={clientes}
+              value={clienteId}
+              onChange={setClienteId}
+              onClienteNovo={(c) => setClientes((l) => [...(l ?? []), c].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")))}
+            />
+          </div>
           <Campo rotulo="No do pedido (do cliente)">
             <input
               value={pedCli}
@@ -366,22 +363,34 @@ function NovoPedidoForm({ onCriado, onErro }: { onCriado: (t: string) => void; o
               className={inputCls}
             />
           </Campo>
-          <Campo rotulo="Representante">
-            <input
-              value={vendedor}
-              onChange={(e) => setVendedor(e.target.value)}
-              placeholder={cliente?.vendedor || ""}
-              className={inputCls}
-            />
-          </Campo>
-          <Campo rotulo="Observacao">
-            <input value={obs} onChange={(e) => setObs(e.target.value)} className={inputCls} />
-          </Campo>
           <label className="flex items-center gap-2 text-sm self-end pb-2">
             <input type="checkbox" checked={urgente} onChange={(e) => setUrgente(e.target.checked)} />
             Urgente (+20%)
           </label>
         </div>
+        {maisDetalhes ? (
+          <div className="grid sm:grid-cols-2 gap-3">
+            <Campo rotulo="Representante">
+              <input
+                value={vendedor}
+                onChange={(e) => setVendedor(e.target.value)}
+                placeholder={cliente?.vendedor || ""}
+                className={inputCls}
+              />
+            </Campo>
+            <Campo rotulo="Observacao">
+              <input value={obs} onChange={(e) => setObs(e.target.value)} className={inputCls} />
+            </Campo>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setMaisDetalhes(true)}
+            className="text-xs text-teal-700 dark:text-teal-400 underline"
+          >
+            + Mais detalhes (representante, observacao)
+          </button>
+        )}
         {clienteId && !prazo && (
           <p className="text-xs text-gray-500">Sem data de entrega, o prazo sai do servico (7 a 10 dias uteis).</p>
         )}
