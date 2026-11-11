@@ -17,6 +17,10 @@ import { comTrava } from "@/lib/sheets-lock";
  * Aqui comecamos limpo: linha 1 = cabecalho, dados a partir da linha 2,
  * coluna A = ID. O codigo le e grava por NOME de coluna, nunca por letra.
  *
+ * ATENCAO: a planilha "Controle Atratizzi" (pasta ASapp no Drive) le PEDIDOS,
+ * GASTOS e RECEBIMENTOS por IMPORTRANGE/QUERY pela LETRA da coluna. Coluna nova
+ * vai sempre no FIM da aba; nunca insira no meio nem reordene.
+ *
  * Para mudar uma aba: edite TABELAS e rode `npx tsx scripts/setup-planilha.ts`
  * (ele so acrescenta aba/cabecalho que falta, nunca apaga dado).
  *

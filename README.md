@@ -38,6 +38,11 @@ Abas: CLIENTES, ORCAMENTOS, PEDIDOS, APONTAMENTOS, PARADAS, ROTINA, ITENS_ESTOQU
 Linha 1 = cabeçalho; o código lê e grava por **nome de coluna** (`src/lib/planilha.ts`). Toda gravação que acrescenta
 linha passa pela trava `_LOCK` (copiada do SApp).
 
+**Controle Atratizzi** (pasta `ASapp` no Drive, id `1DwcZRJfFDc5gg_g6JlHnZCnkTqrPQ8tISup6dyGlbPk`): planilha só de
+consulta para Costa, Junior, Fernando e contador - Resumo (situação de hoje + mês a mês), Pedidos, Faturamento,
+Recebimentos, Gastos. Puxa PEDIDOS/GASTOS/RECEBIMENTOS por IMPORTRANGE + QUERY **pela letra da coluna**: coluna nova
+nas abas do app vai sempre no FIM (inserir no meio desloca as letras e quebra o controle).
+
 Preços, mínimos, metas e limites de alerta: `src/lib/config.ts`. Meta de cada mês: aba METAS (sem linha, usa o plano
 padrão a partir de `INICIO_OPERACAO` em `src/lib/metas.ts`, hoje `2026-11`).
 
