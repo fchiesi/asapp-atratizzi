@@ -107,8 +107,8 @@ export function Chat() {
   }
 
   return (
-    <div className="h-full flex flex-col">
-      <header className="p-6 pl-16 lg:pl-6 border-b border-gray-200 dark:border-gray-800">
+    <div className="h-full flex flex-col pb-16 lg:pb-0">
+      <header className="p-6 border-b border-gray-200 dark:border-gray-800">
         <h1 className="text-2xl font-bold">Chat IA</h1>
         <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
           Pergunte sobre pedidos, producao, financeiro e metas da operacao

@@ -8,6 +8,7 @@ Google Sheets via Service Account, chat com Claude), com módulos pensados para 
 
 | Tela | Para quem | O que faz |
 |---|---|---|
+| `/foto` | quem lança (diretoria, administrativo, Junior, operador, vendedor) | **Lançar por foto** (botão 📷 no centro da barra de baixo, no celular): nota/boleto → conta a pagar (+ itens da nota entram no estoque), pedido de cliente (papel, print, PDF) → pedido com os desenhos, comprovante PIX → baixa da conta a receber, NF/romaneio do tecido do cliente → entrada e libera o pedido, cartão do cliente → cadastro. A IA (Claude) só **lê**: a pessoa confere o formulário preenchido e grava. |
 | `/painel` | diretoria, administrativo, sócios | Metas do mês: metros faturados × meta e ponto de equilíbrio, preço médio, conversão de amostra, perdas, entregas no prazo, inadimplência, resultado de caixa. Botão **Imprimir relatório** (relatório mensal aos sócios). |
 | `/comercial` | vendedor, administrativo, diretoria | Clientes (cadastro curto: nome, telefone, pagamento; o resto em "Mais dados") e orçamentos. Orçamento e pedido têm **+ Novo** para cadastrar o cliente sem sair da tela. Preço sugerido por serviço, +20% urgente, aviso de pedido mínimo. Fluxo **orçamento → amostra cobrada (R$ 80) → aprovar → pedido**. |
 | `/pedidos` | idem + produção | **Novo pedido** no modelo do SApp: nº do pedido do cliente, entrega, pagamento (50/50, 28, 30/60/90), representante e **uma linha por desenho**. Lista com metros impressos × pedidos, prazo, atraso, status, máquina, NF e **Entregue**. |

@@ -8,6 +8,12 @@ import { Aviso, Botao, Campo, inputCls } from "./ui";
 
 const VAZIO = { nome: "", telefone: "", condicao: "novo" as Condicao, documento: "", cidade: "Blumenau", contato: "", email: "", obs: "" };
 
+function limpo(i?: Partial<Record<string, string>>): Partial<typeof VAZIO> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(i ?? {})) if (v) out[k] = v;
+  return out as Partial<typeof VAZIO>;
+}
+
 /**
  * Cadastro rapido de cliente: nome, telefone e condicao de pagamento; o resto
  * fica em "Mais dados". Sem <form> de proposito: aparece DENTRO do formulario
@@ -16,12 +22,15 @@ const VAZIO = { nome: "", telefone: "", condicao: "novo" as Condicao, documento:
 export function ClienteNovo({
   onCriado,
   onCancelar,
+  inicial,
 }: {
   onCriado: (c: Cliente) => void;
   onCancelar?: () => void;
+  /** campos ja preenchidos (ex.: lidos de uma foto) */
+  inicial?: Partial<Record<keyof typeof VAZIO, string>>;
 }) {
-  const [f, setF] = useState(VAZIO);
-  const [mais, setMais] = useState(false);
+  const [f, setF] = useState(() => ({ ...VAZIO, ...limpo(inicial) }));
+  const [mais, setMais] = useState(() => !!(inicial?.documento || inicial?.email || inicial?.contato));
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const set = (k: keyof typeof VAZIO) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>

@@ -28,6 +28,20 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/chat", label: "Chat IA", icon: "💬", requires: "use_chat" },
 ];
 
+const FOTO_CAPS: Capability[] = ["write_financial", "write_pedidos", "write_estoque"];
+
+function Atalho({ item, ativo }: { item: NavItem; ativo: boolean }) {
+  return (
+    <Link
+      href={item.href}
+      className={`flex flex-col items-center justify-center flex-1 h-full ${ativo ? "text-teal-300" : "text-gray-300"}`}
+    >
+      <span className="text-xl leading-none">{item.icon}</span>
+      <span className="text-[10px] mt-1 truncate max-w-[72px]">{item.label.split(" ")[0]}</span>
+    </Link>
+  );
+}
+
 interface Props {
   userEmail?: string | null;
   userName?: string | null;
@@ -43,6 +57,10 @@ export function SidebarClient({ userEmail, userName, userRole }: Props) {
     return document.documentElement.classList.contains("dark");
   });
   const pathname = usePathname();
+  const ativo = (href: string) => pathname === href || pathname.startsWith(href + "/");
+  // mesmas capabilities de src/lib/leitura-foto.ts (CAPABILITY_FOTO), que e' so de servidor
+  const podeFoto = FOTO_CAPS.some((c) => userCaps.includes(c));
+  const atalhos = visibleNav.filter((i) => i.href !== "/chat");
 
   function toggleDark() {
     const next = !dark;
@@ -53,16 +71,40 @@ export function SidebarClient({ userEmail, userName, userRole }: Props) {
 
   return (
     <>
-      {/* Hamburger button - mobile only */}
-      <button
-        onClick={() => setMobileOpen(true)}
-        className="fixed top-4 left-4 z-40 lg:hidden bg-gray-900 text-white p-2 rounded-lg shadow-lg"
-        aria-label="Abrir menu"
+      {/* Barra de baixo - so no celular: atalhos + Foto no centro + Menu */}
+      <nav
+        className="fixed bottom-0 inset-x-0 z-40 lg:hidden bg-gray-900 text-white border-t border-gray-800 pb-[env(safe-area-inset-bottom)]"
+        aria-label="Atalhos"
       >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-      </button>
+        <div className="flex items-end justify-around h-16">
+          {atalhos.slice(0, 2).map((item) => (
+            <Atalho key={item.href} item={item} ativo={ativo(item.href)} />
+          ))}
+          {podeFoto && (
+            <Link
+              href="/foto"
+              aria-label="Lancar por foto"
+              className={`-mt-6 mb-1 flex flex-col items-center justify-center w-16 h-16 rounded-full shadow-lg text-2xl ${
+                ativo("/foto") ? "bg-teal-500" : "bg-teal-600"
+              }`}
+            >
+              📷
+              <span className="text-[10px] font-semibold -mt-0.5">Foto</span>
+            </Link>
+          )}
+          {atalhos.slice(2, podeFoto ? 3 : 4).map((item) => (
+            <Atalho key={item.href} item={item} ativo={ativo(item.href)} />
+          ))}
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="flex flex-col items-center justify-center flex-1 h-full text-gray-300"
+            aria-label="Abrir menu"
+          >
+            <span className="text-xl leading-none">☰</span>
+            <span className="text-[10px] mt-1">Menu</span>
+          </button>
+        </div>
+      </nav>
 
       {/* Backdrop - mobile only */}
       {mobileOpen && (
@@ -100,7 +142,12 @@ export function SidebarClient({ userEmail, userName, userRole }: Props) {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+          {podeFoto && (
+            <NavLink href="/foto" icon="📷" active={ativo("/foto")} onClick={() => setMobileOpen(false)}>
+              Lancar por foto
+            </NavLink>
+          )}
           {visibleNav.map((item) => {
             const active =
               pathname === item.href ||

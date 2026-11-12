@@ -17,7 +17,7 @@ export function Cabecalho({ titulo, subtitulo, acoes }: { titulo: string; subtit
 }
 
 export function Pagina({ children }: { children: ReactNode }) {
-  return <div className="p-4 pt-16 lg:pt-8 md:p-8 max-w-7xl mx-auto">{children}</div>;
+  return <div className="px-4 pt-5 pb-28 md:px-8 lg:py-8 max-w-7xl mx-auto">{children}</div>;
 }
 
 export function Card({ titulo, children, className = "" }: { titulo?: ReactNode; children: ReactNode; className?: string }) {

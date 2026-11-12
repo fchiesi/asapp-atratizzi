@@ -9,7 +9,7 @@ export default async function SemAcessoPage() {
   const destino = paginaInicial(session.user.role);
   if (destino !== "/sem-acesso") redirect(destino);
   return (
-    <div className="min-h-screen p-6 pt-16 lg:pt-6 max-w-xl mx-auto">
+    <div className="min-h-screen p-6 pb-28 lg:pb-6 max-w-xl mx-auto">
       <h1 className="text-2xl font-bold mb-3">Sem acesso liberado</h1>
       <p className="text-gray-600 dark:text-gray-400">
         Voce entrou como <b>{session.user.email}</b>, mas ainda nao ha nenhuma area do ASApp liberada para o seu
